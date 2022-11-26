@@ -120,7 +120,6 @@ function bash_aliases()
 		echo "There is an \"occ\" alias in ${home_dir}.bash_aliases:"
 		grep "occ" ${home_dir}/.bash_aliases
 	elif [[ -w ${home_dir}/.bash_aliases ]]; then
-${default_colour}
 		echo -en "Add alias to ${yellow}${home_dir}/.bash_aliases${default_colour}?"
 		read -s -p " (y/N) " -n 1 answer
 		if [[ ${answer} =~ ^Y|y ]] ; then
