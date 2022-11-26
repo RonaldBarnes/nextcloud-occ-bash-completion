@@ -9,12 +9,19 @@
 set -u
 
 
+green_light="\e[1;32m"
+yellow='\e[1;33m'
+red='\e[1;31m'
+default_colour="\e[00m"
+
+
 ## Leave no trace after exit (except alias(es)):
 function cleanup_vars()
 	{
 	unset value
 	unset httpdUser
 	unset user_name
+	unset home_dir
 	unset aliasExists
 	unset phpFound
 	unset answer
@@ -28,10 +35,16 @@ function cleanup_vars()
 	unset occPath
 	unset getOccPath
 
+	unset green_light
+	unset yellow
+	unset red
+	unset default_colour
+
 	## Reset all trap signals:
 	trap - SIGINT
 	trap - SIGHUP
 	trap - SIGTERM
+	## trap - HALT
 	trap - SIGKILL
 	trap - EXIT
 	trap - QUIT
@@ -91,13 +104,44 @@ function getOccPath()
 	}
 
 
+function bash_aliases()
+	{
+#	echo "PARM COUNT: $#"
+	if [[ $# -eq 0 ]] ; then
+		return 99
+	else
+#		echo "PARM COUNT: ${#}:  \"$1\""
+		home_dir=${1}
+	fi
+
+	grep "occ" ${home_dir}/.bash_aliases
+	aliasExists=$?
+	if [[ aliasExists -eq 0 ]]; then
+		echo "There is an \"occ\" alias in ${home_dir}.bash_aliases:"
+		grep "occ" ${home_dir}/.bash_aliases
+	elif [[ -w ${home_dir}/.bash_aliases ]]; then
+${default_colour}
+		echo -en "Add alias to ${yellow}${home_dir}/.bash_aliases${default_colour}?"
+		read -s -p " (y/N) " -n 1 answer
+		if [[ ${answer} =~ ^Y|y ]] ; then
+			echo "Y"
+			echo "${aliasString}" >> ${home_dir}/.bash_aliases
+		else
+	##	if [[ ${answer} != "" ]] ; then
+			echo "N"
+		fi
+	fi
+	}
+
+
+
 
 ## Run EVERYTHING in a subshell so "trap ... RETURN" doesn't linger:
 ## (
 ## Cleanup all variables on exit:
-trap 'cleanup_vars' SIGINT SIGKILL SIGTERM
+## trap 'cleanup_vars' SIGINT SIGKILL SIGTERM
 ## Cleanup ALL variables on exit (including cleanup_vars() itself):
-trap 'cleanup_vars ALL' RETURN EXIT QUIT
+trap 'cleanup_vars ALL' RETURN EXIT QUIT SIGINT SIGKILL SIGTERM
 
 
 ## Store web server user name(s) from /etc/passwd as indexed array:
@@ -113,10 +157,11 @@ fi
 
 
 if [ ${#httpdUser[0]} -eq 0 ] ; then
-	echo "WARNING: No web server user found."
+	echo -e "${yellow}WARNING${default_colour}: No web server user found."
 	return 1
 else
-	echo "Web server user name: \"${httpdUser[0]}\"."
+	echo -ne "Web server user name: "
+	echo -e "\"${green_light}${httpdUser[0]}${default_colour}\"."
 fi
 
 
@@ -134,8 +179,8 @@ else
 	which php 2>&1 > /dev/null
 	phpFound=$?
 	if [ $phpFound -ne 0 ]; then
-		echo "ERROR: php not found in path."
-		return 1
+		echo -e "${red}ERROR${default_colour}: php not found in path."
+		kill -s SIGKILL $$
 	fi
 	occPath="$(pwd)/occ"
 	if [[ -f ${occPath} ]] ; then
@@ -143,20 +188,19 @@ else
 	else
 		echo "Can't find \"occ\", not in current directory."
 		getOccPath
-#		echo "Can't find \"occ\", not in current directory."
-#		read -ep "Path to occ: " -i "/" occPath
-#		echo "occPath: \"${occPath}\""
-#		return 10
 	fi
 	occOwner=$(stat --format="%U" ${occPath})
 	if [[ ${occOwner} != ${httpdUser[0]} ]] ; then
-		echo "ERROR: Owner of occ is not web server user:"
+		echo -e "${red}ERROR${default_colour}: Owner of occ is not web server user:"
 		echo "	${occOwner} != ${httpdUser}"
-		return 99
+		kill -s SIGKILL $$
+##		return 99
 	fi
 
 	aliasString="occ='sudo --user ${httpdUser} php ${occPath}'"
-	read -s -p "Run \"alias ${aliasString}\" (y/N)? " -n 1 answer
+	echo -ne "Run \"${yellow}alias ${green_light}${aliasString}${default_colour}\""
+#	read -s -p "Run \"alias ${aliasString}\" (y/N)? " -n 1 answer
+	read -s -p " (y/N)? " -n 1 answer
 	if [[ ${answer} =~ ^[Yy] ]] ; then
 		echo "Y"
 		eval alias "${aliasString}"
@@ -168,21 +212,20 @@ else
 fi
 
 ## Is there an occ alias in ~/.bash_aliases?
-grep "occ" $HOME/.bash_aliases
-aliasExists=$?
-if [[ aliasExists -eq 0 ]]; then
-	echo "There seems to be an alias in $HOME/.bash_aliases for \"occ\":"
-	grep "occ" $HOME/.bash_aliases
-elif [[ -w $HOME/.bash_aliases ]]; then
-	read -s -p "Add alias to $HOME/.bash_aliases? (y/N) " -n 1 answer
-	if [[ ${answer} =~ ^Y|y ]] ; then
-		echo "Y"
-		echo "${aliasString}" >> $HOME/.bash_aliases
-	else
-##	if [[ ${answer} != "" ]] ; then
-		echo "N"
+bash_aliases $HOME
+home_dir=""
+if [[ "${SUDO_USER}" != "" ]] ; then
+	## Find user-who-ran-sudo's home directory:
+	home_dir=$(grep ${SUDO_USER} /etc/passwd)
+	## Strip off colon->end-of-line
+	home_dir=${home_dir%:*}
+	## Strip off start-of-line->last colon:
+	home_dir=${home_dir##*:}
+	if [[ "$HOME" != "${home_dir}" ]] ; then
+		bash_aliases ${home_dir}
 	fi
 fi
+
 
 
 cleanup_vars ALL
