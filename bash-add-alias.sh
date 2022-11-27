@@ -101,15 +101,6 @@ function getHttpdUser()
 	}
 
 
-function getHttpdUser_old()
-	{
-	read -a httpdUser <<< $(grep							\
-		--extended-regex												\
-		--ignore-case														\
-		--only-matching													\
-		"(httpd|www-data|nobody)" /etc/passwd		\
-		)
-	}
 
 
 function getOccPath()
