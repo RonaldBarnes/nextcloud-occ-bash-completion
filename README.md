@@ -10,9 +10,19 @@ Furthermore, an alias is needed for `occ`: the `bash-add-alias.sh` script will:
 * offer to add the alias to the user's `.bash_aliases` file
 * offer to add the alias to the  `SUDO_USER`'s `.bash_aliases` file, when relevant
 * verify that `occ` is owned by the web server user that it found
+* offer to copy `complete.occ` to `/etc/bash_completion.d` if both exist, then
+  ensure correct owner (`root:root`) and permissions (`0644`) are applied
 
+<br />
+<br />
+<del>Finally, the user needs to run the following commands:</del>
 
-Finally, the user needs to run the following commands:
+<br />
+
+<br />
+
+The following is now taken care of by `bash-add-alias.sh`:
+
 ```
 chown -v root: complete.occ
 chmod -v 0644 complete.occ
@@ -25,4 +35,3 @@ Once the alias has been created, the completion will
 * present all valid switches (starting with "`-`") if `-` is the first character of a word
 * present all commands up to and including the first colon (`:`)
 * once a command has been chosen, remaining `TAB`s will present all subcommands
-
